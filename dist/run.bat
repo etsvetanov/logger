@@ -1,0 +1,1 @@
+START /B "D:\PYTHON\SecurityLoggerRepo\dist\main.exe"
